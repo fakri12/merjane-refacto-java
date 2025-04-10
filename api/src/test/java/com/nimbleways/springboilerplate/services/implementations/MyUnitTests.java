@@ -11,6 +11,11 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.time.LocalDate;
+
+import static org.mockito.Mockito.*;
+
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(SpringExtension.class)
@@ -23,6 +28,10 @@ public class MyUnitTests {
     private ProductRepository productRepository;
     @InjectMocks 
     private ProductService productService;
+    @InjectMocks
+    private NormalProductProcessor normalProductProcessor;
+    @InjectMocks
+    private ExpirableProductProcessor expirableProcessor;
 
     @Test
     public void test() {
@@ -39,5 +48,29 @@ public class MyUnitTests {
         assertEquals(15, product.getLeadTime());
         Mockito.verify(productRepository, Mockito.times(1)).save(product);
         Mockito.verify(notificationService, Mockito.times(1)).sendDelayNotification(product.getLeadTime(), product.getName());
+    }
+
+    @Test
+    public void shouldDecrementNormalProductIfAvailable() {
+        // GIVEN
+        Product product = new Product(null, 5, 10, "NORMAL", "Test Product", null, null, null);
+
+        // WHEN
+        normalProductProcessor.process(product);
+
+        // THEN
+        assertEquals(9, product.getAvailable());
+        verify(productRepository, times(1)).save(product);
+    }
+
+    @Test
+    public void shouldNotifyIfProductExpired() {
+        Product expiredProduct = new Product(null, 5, 1, "EXPIRABLE", "Yogurt", LocalDate.now().minusDays(1), null, null);
+
+        expirableProcessor.process(expiredProduct);
+
+        assertEquals(0, expiredProduct.getAvailable());
+        verify(notificationService).sendExpirationNotification("Yogurt", expiredProduct.getExpiryDate());
+        verify(productRepository).save(expiredProduct);
     }
 }
